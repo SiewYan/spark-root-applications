@@ -19,7 +19,9 @@ import org.dianahep.histogrammar._
 import org.dianahep.histogrammar.ascii._
 
 // for casting
-case class Event(muons: Seq[RecoLeafCandidate]);
+case class Event(muons: Muons);
+case class Muons(seq: Seq[RecoLeafCandidate], pt: Float)
+
 
 object ReductionExampleApp {
   def main(args: Array[String]) {
@@ -37,21 +39,19 @@ object ReductionExampleApp {
 
     // select only AOD Collection of Muons. Now you have Dataset[Event].
     val dsMuons = df.select("recoMuons_muons__RECO_.recoMuons_muons__RECO_obj.reco::RecoCandidate.reco::LeafCandidate").toDF("muons").as[Event]
-
     // define the empty[zero] container of Histos
-/*
-    case class MuonVars(var pt: Double, var eta: Double, var phi: Double, var m: Double)
-    case class AllVars(var muonvars: MuonVars = null)
-    val allvars = AllVars(null)
-*/
+
+
     val emptyDiCandidate = Label(
       "pt" -> Bin(200, 0, 200, {m: DiCandidate => m.pt}),
       "eta" -> Bin(48, -2.4, 2.4, {m: DiCandidate => m.eta}),
       "phi" -> Bin(63, -3.15, 3.15, {m: DiCandidate => m.phi}),
       "mass" -> Bin(200, 0, 200, {m: DiCandidate => m.mass})
     )
-    val dsfMuons = dsMuons.filter(_.muons.pt >= 10)
-      .map({e: Event => for (i <- 0 until e.muons.length) yield buildDiCandidate(e.muons(i),0)})
+      
+      val dsfMuons = dsMuons.filter(filterMuons(_).muons.pt >= 10)
+	.flatMap({e: Event => for (i <- 0 until e.muons.seq.length) yield buildCandidate(e.muons.seq(i))})
+
 /*	
 //    var vmuon = LorentzVector(0,0,0,0)
       if (!dsfMuons.isEmpty) {
@@ -64,15 +64,32 @@ object ReductionExampleApp {
 //        vmuon = LorentzVector(m.pt, m.eta, m.phi, muonMass)
       }
 */
-    dsfMuons.show
-    dsfMuons.write.format("parquet").save("file:/tmp/testReduced.parquet")
-    val filled = dsfMuons.rdd.aggregate(emptyDiCandidate)(new Increment, new Combine);
-    filled("pt").println;
-    filled.toJsonFile("/tmp/testBundle.json")
+//    dsfMuons.show
+//    dsfMuons.write.format("parquet").save("file:/tmp/testReduced.parquet")
+//    val filled = dsfMuons.rdd.aggregate(emptyDiCandidate)(new Increment, new Combine);
+//    filled("pt").println;
+//    filled.toJsonFile("/tmp/testBundle.json")
 
+def filterMuons(e: Event): Event = {
+    var r = e.muons.seq(0).pt
+    for( i <- 0 until e.muons.seq.length ) {
+        var muon_p = e.muons.seq(i).pt
+        if (r <= muon_p) {
+          r = muon_p
+        }
+    }
+    val mu = Muons(e.muons.seq , r)
+    val ef = Event(mu)
+
+    return ef
+  }
     // stop the session/context
     spark.stop
+
   }
+
+
+
 /*
   def filterMuon(m: baconhep.TMuon) = {
       m.pt >= 10 && Math.abs(m.eta) < 2.4 && passMuonLooseSel(m)
