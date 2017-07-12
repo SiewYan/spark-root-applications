@@ -48,9 +48,23 @@ object ReductionExampleApp {
       "phi" -> Bin(63, -3.15, 3.15, {m: DiCandidate => m.phi}),
       "mass" -> Bin(200, 0, 200, {m: DiCandidate => m.mass})
     )
+    def filterMuons(e: Event): Event = {
+      var r = e.muons.seq(0).pt
+      for( i <- 0 until e.muons.seq.length ) {
+          var muon_p = e.muons.seq(i).pt
+          if (r <= muon_p) {
+            r = muon_p
+          }
+      }
+      val mu = Muons(e.muons.seq , r)
+      val ef = Event(mu)
+
+      return ef
+     }
       
-      val dsfMuons = dsMuons.filter(filterMuons(_).muons.pt >= 10)
-	.flatMap({e: Event => for (i <- 0 until e.muons.seq.length) yield buildCandidate(e.muons.seq(i))})
+      dsMuons.filter(filterMuons(_).muons.pt >= 10)
+
+      val dsfMuons = dsMuons.flatMap({e: Event => for (i <- 0 until e.muons.seq.length) yield buildCandidate(e.muons.seq(i))})
 
 /*	
 //    var vmuon = LorentzVector(0,0,0,0)
@@ -70,19 +84,7 @@ object ReductionExampleApp {
 //    filled("pt").println;
 //    filled.toJsonFile("/tmp/testBundle.json")
 
-def filterMuons(e: Event): Event = {
-    var r = e.muons.seq(0).pt
-    for( i <- 0 until e.muons.seq.length ) {
-        var muon_p = e.muons.seq(i).pt
-        if (r <= muon_p) {
-          r = muon_p
-        }
-    }
-    val mu = Muons(e.muons.seq , r)
-    val ef = Event(mu)
 
-    return ef
-  }
     // stop the session/context
     spark.stop
 
